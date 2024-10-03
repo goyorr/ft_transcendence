@@ -6,8 +6,8 @@ ft_transcendence is a full-featured web application offering multiplayer gaming,
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Grade and Subject](#grade-and-subject)
-- [Screenshots](#screenshots)
 - [Demo Video](#demo-video)
+- [Screenshots](#screenshots)
 
 ---
 
