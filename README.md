@@ -12,7 +12,7 @@ ft_transcendence is a full-featured web application offering multiplayer gaming,
 ---
 
 ## Features
-- **Profiles**: View and edit player profiles.
+- **Profiles**: View, edit and delete player profiles.
 - **Friends & Blocks**: Add friends or block other users.
 - **Chat**: Real-time messaging between users.
 - **Match History**: View stats and history of past matches.
@@ -21,8 +21,6 @@ ft_transcendence is a full-featured web application offering multiplayer gaming,
 - **Local Game & Tournaments**: Host local games and tournaments.
 - **Remote Tournament**: Join remote tournaments for competitive gameplay.
 - **Multiplayer 2v2**: Play with or against friends in team-based matches.
-- **Elasticsearch**: Full-text search for players and match history.
-- **Secure Communication**: All interactions happen over HTTPS.
 
 ## Tech Stack
 - **Frontend**: Next.js, TypeScript, TailwindCSS
