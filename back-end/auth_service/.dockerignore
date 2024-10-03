@@ -1,0 +1,3 @@
+users/
+users/*.pyc
+users/__pycache__

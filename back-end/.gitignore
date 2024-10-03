@@ -1,0 +1,7 @@
+env
+.env
+.vscode
+post-images
+back-end/auth_service/logs
+auth_service/users/migrations/
+auth_service/game/migrations/

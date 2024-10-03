@@ -1,0 +1,229 @@
+version: '3'
+
+services:
+  nginx:
+    container_name: nginx
+    build:
+      context: ./nginx/
+      dockerfile: Dockerfile
+    ports:
+      - "443:443"
+    restart: always
+    networks:
+      - net
+    volumes: 
+      - ./nginx/conf:/etc/nginx/conf.d/
+      -  static_volume:/usr/share/nginx/html/static
+      - ./back-end/auth_service/files_uploaded:/files_uploaded
+    depends_on:
+      - backend
+  postgres:
+    container_name: psql
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=${DATABASE_USER}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
+      - POSTGRES_DB=${DATABASE_NAME}
+    ports:
+      - "5432:5432"
+    restart: always
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    networks:
+      - net
+  redis:
+    image: redis:alpine
+    container_name: redis
+    networks:
+      - net
+
+  backend:
+    container_name: backend
+    build:
+      context: ./back-end/auth_service
+      dockerfile: Dockerfile
+    volumes:
+      - ./back-end/auth_service:/backend
+      - ./back-end/auth_service/files_uploaded:/files_uploaded
+      - static_volume:/backend/staticfiles
+      - ./back-end/auth_service/logs/:/backend/logs/
+    expose:
+      - 8000
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+      - logstash
+    env_file:
+      - .env
+    networks:
+      - net
+    
+  frontend:
+    container_name: frontend
+    build:
+      context: ./front-end/
+      dockerfile: Dockerfile.production
+    # volumes:
+    #   - ./front-end:/front-end
+    #   - /front-end/node_modules
+    ports:
+      - "3000:3000"
+    restart: always
+    networks:
+      - net
+    env_file:
+      - .env
+      
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.14.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ELASTIC_PASSWORD=$ELASTIC_PASSWORD
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-u", "elastic:${ELASTIC_PASSWORD}", "http://localhost:9200/_cluster/health"]
+      interval: 30s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.14.0
+    container_name: logstash
+    volumes:
+      - ./logstash/config:/usr/share/logstash/config
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - ./back-end/auth_service/logs/:/usr/share/logstash/logs
+    environment:
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ELASTIC_PASSWORD=$ELASTIC_PASSWORD
+
+    command: logstash -f /usr/share/logstash/pipeline/logstash.conf
+    ports:
+      - "5000:5000"
+      - "9600:9600"
+    networks:
+      - net
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.14.0
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=$ELASTIC_PASSWORD
+    ports:
+      - "5601:5601"
+    networks:
+      - net
+    depends_on:
+      - elasticsearch
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-u", "elastic:${ELASTIC_PASSWORD}", "http://localhost:5601/api/status"]
+      interval: 30s
+      retries: 3
+      start_period: 30s
+      timeout: 10s
+
+
+  create-index-pattern:
+    image: curlimages/curl:latest
+    depends_on:
+      kibana:
+        condition: service_healthy
+    environment:
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+    entrypoint: ["sh", "-c", "curl -X POST 'http://kibana:5601/api/saved_objects/index-pattern/my-index-pattern' -H 'Content-Type: application/json' -H 'kbn-xsrf: true' -u 'elastic:$ELASTIC_PASSWORD' -d'{\"attributes\":{\"title\":\"django-logs-*\",\"timeFieldName\":\"@timestamp\"}}'"]
+    networks:
+      - net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://kibana:5601/api/saved_objects/index-pattern/my-index-pattern"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+
+  import-dashboard:
+    image: curlimages/curl:latest
+    depends_on:
+      kibana:
+        condition: service_healthy
+    environment:
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+    entrypoint: ["sh", "-c", "curl -X POST 'http://kibana:5601/api/saved_objects/_import' -H 'Content-Type: multipart/form-data' -H 'kbn-xsrf: true' -u 'elastic:$ELASTIC_PASSWORD' --form file=@/dashbaord.ndjson"]
+    volumes:
+      - ./dashbaord.ndjson:/dashbaord.ndjson
+    networks:
+      - net
+
+  ilm-setup:
+    image: curlimages/curl:latest
+    depends_on:
+      kibana:
+        condition: service_healthy
+    environment:
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+    networks:
+      - net
+    entrypoint: >
+      sh -c '
+        curl -X PUT "http://elasticsearch:9200/_ilm/policy/django-logs-policy" -H "Content-Type: application/json" -u "elastic:${ELASTIC_PASSWORD}" -d '"'"'{
+          "policy":{
+            "phases": {
+              "hot": {
+                "actions": {
+                  "rollover": {
+                    "max_age": "5m",
+                    "max_size": "5MB"
+                  }
+                }
+              },
+              "warm": {
+                "min_age": "6m",
+                "actions": {
+                  "shrink": {
+                    "number_of_shards": 1
+                  }
+                }
+              },
+              "delete": {
+                "actions": {
+                  "delete": {}
+                }
+              }
+            }
+          }
+        }'"'"' && \
+        curl -X PUT "http://elasticsearch:9200/_template/django-logs-template" -H "Content-Type: application/json" -u "elastic:${ELASTIC_PASSWORD}" -d '"'"'{
+          "index_patterns": ["django-logs-*"],
+          "settings": {
+            "index.lifecycle.name": "django-logs-policy",
+            "index.lifecycle.rollover_alias": "django-logs"
+          }
+        }'"'"'
+      '
+networks:
+  net:
+
+volumes:
+  log_volume:
+    driver: local
+  static_volume:
+    driver: local
+  cache:
+    driver: local
