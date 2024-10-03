@@ -27,9 +27,7 @@ ft_transcendence is a full-featured web application offering multiplayer gaming,
 ## Tech Stack
 - **Frontend**: Next.js, TypeScript, TailwindCSS
 - **Backend**: Django, Django Channels, WebSockets, PostgreSQL
-- **Search Engine**: Elasticsearch
-- **Real-Time Communication**: WebSockets
-- **Deployment**: Docker, Nginx, HTTPS
+- **Deployment**: Docker, Nginx
 - **Authentication**: OAuth 2.0, JWT
 
 ## Grade and Subject
