@@ -30,7 +30,11 @@ ft_transcendence is a full-featured web application offering multiplayer gaming,
 
 ## Grade and Subject
 [View the Subject PDF](subject.pdf)
+
 ![Description of Image](assets/images/FinalGrade.png)
+
+## Demo Video
+https://github.com/user-attachments/assets/20025dcd-6a7f-4018-bc40-e834c3893d96
 
 ## Screenshots
 ![Description of Image](assets/images/signup.png)
@@ -52,8 +56,3 @@ ft_transcendence is a full-featured web application offering multiplayer gaming,
 ![Description of Image](assets/images/remotetour.png)
 ![Description of Image](assets/images/chat.png)
 ![Description of Image](assets/images/dashboard.png)
-
-
-
-## Demo Video
-https://github.com/user-attachments/assets/20025dcd-6a7f-4018-bc40-e834c3893d96
